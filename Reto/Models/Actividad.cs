@@ -26,10 +26,10 @@ public partial class Actividad
     public string? Tipo { get; set; }
 
     [Column(TypeName = "datetime")]
-    public DateTime? FechaHoraInicio { get; set; }
+    public DateTime FechaHoraInicio { get; set; }
 
     [Column(TypeName = "datetime")]
-    public DateTime? FechaHoraFin { get; set; }
+    public DateTime FechaHoraFin { get; set; }
 
     [ForeignKey("HeroeId")]
     [InverseProperty("Actividads")]
