@@ -87,6 +87,48 @@ namespace Reto.Controllers
             return luchaDto;
         }
 
+        // GET: api/Luchas/MasVictorias
+        [HttpGet("MasVictorias")]
+        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroesConMasVictorias()
+        {
+            var heroesConMasVictorias = await _context.Luchas
+                .Where(l => l.Vencedor) // Suponiendo que Vencedor es verdadero si el héroe gana
+                .GroupBy(l => l.HeroeId)
+                .Select(group => new { HeroeId = group.Key, Victorias = group.Count() })
+                .OrderByDescending(x => x.Victorias)
+                .Take(3) // Tomar los tres primeros
+                .ToListAsync();
+
+            var heroesIds = heroesConMasVictorias.Select(h => h.HeroeId).ToList();
+            var heroes = await _context.Heroes
+                                       .Where(h => heroesIds.Contains(h.Id))
+                                       .ToListAsync();
+
+            var heroesDto = heroes.Select(heroe => new HeroeDto
+            {
+                Id = heroe.Id,
+                Nombre = heroe.Nombre,
+                Edad = heroe.Edad,
+                Escuela = heroe.Escuela,
+                Habilidades = heroe.Habilidads.Select(hab => hab.Nombre).ToList(),
+                Debilidades = heroe.Debilidads.Select(deb => deb.Nombre).ToList(),
+                Patrocinadores = heroe.Patrocinadors.Select(pat => new PatrocinadorDto
+                {
+                    Nombre = pat.Nombre,
+                    Origen = pat.Origen,
+                    Monto = pat.Monto,
+                }).ToList(),
+                Relaciones = heroe.Relacions.Select(rel => new RelacionDto
+                {
+                    Nombre = rel.Nombre,
+                    Relacion = rel.Relacion1
+                }).ToList()
+            }).ToList();
+
+            return heroesDto;
+        }
+
+
         //// PUT: api/Luchas/5
         //// To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         //[HttpPut("{id}")]

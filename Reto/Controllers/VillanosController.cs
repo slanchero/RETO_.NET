@@ -24,19 +24,32 @@ namespace Reto.Controllers
 
         // GET: api/Villanos
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<VillanoDto>>> GetVillanos()
+        public async Task<ActionResult<IEnumerable<VillanoDto>>> GetVillanos(string? nombre = null, string? origen = null, string? habilidad = null)
         {
-            if (_context.Villanos == null)
+            IQueryable<Villano> query = _context.Villanos;
+
+            // Filtrar por parte del nombre del villano
+            if (!string.IsNullOrEmpty(nombre))
             {
-                return NotFound();
+                query = query.Where(v => v.Nombre.Contains(nombre));
             }
 
-            // Cargar los datos necesarios incluyendo relaciones si es necesario
-            var villanos = await _context.Villanos
-                                       .Include(h => h.Habilidads)
-                                       .ToListAsync();
+            // Filtrar por origen
+            if (!string.IsNullOrEmpty(origen))
+            {
+                query = query.Where(v => v.Origen == origen);
+            }
 
-            // Mapear a DTOs
+            // Filtrar por debilidad
+            // Asumiendo que tienes una relación con una entidad 'Debilidad' o similar
+            if (!string.IsNullOrEmpty(habilidad))
+            {
+                query = query.Where(v => v.Habilidads.Any(d => d.Nombre == habilidad));
+            }
+
+            var villanos = await query.Include(v => v.Habilidads)
+                                      .ToListAsync();
+
             var villanosDto = villanos.Select(v => new VillanoDto
             {
                 Id = v.Id,
@@ -71,6 +84,40 @@ namespace Reto.Controllers
 
             return villanoDto;
         }
+
+        // GET: api/Villanos/adolecentes
+        [HttpGet("adolecentes")]
+        public async Task<ActionResult<VillanoDto>> GetVillanoConMasDerrotasContraAdolescentes()
+        {
+            var villanoConMasDerrotas = await _context.Luchas
+                .Where(l => l.Heroe.Edad < 18 && !l.Vencedor) // Considera una lucha donde el héroe es adolescente y el villano perdió
+                .GroupBy(l => l.VillanoId)
+                .Select(group => new { VillanoId = group.Key, Derrotas = group.Count() })
+                .OrderByDescending(x => x.Derrotas)
+                .FirstOrDefaultAsync();
+
+            if (villanoConMasDerrotas == null)
+            {
+                return NotFound("No se encontraron villanos que cumplan con el criterio.");
+            }
+
+            var villano = await _context.Villanos.FindAsync(villanoConMasDerrotas.VillanoId);
+            if (villano == null)
+            {
+                return NotFound();
+            }
+
+            var villanoDto = new VillanoDto
+            {
+                Id = villano.Id,
+                Nombre = villano.Nombre,
+                Edad = villano.Edad,
+                // Otros mapeos necesarios
+            };
+
+            return villanoDto;
+        }
+
 
         // PUT: api/Villanos/5
         [HttpPut("{id}")]

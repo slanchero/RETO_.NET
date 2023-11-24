@@ -74,6 +74,33 @@ namespace Reto.Controllers
             return patrocinadorDto;
         }
 
+        // GET: api/Patrocinador/mayorPatrocinio
+        [HttpGet("mayorPatrocinio")]
+        public async Task<ActionResult<PatrocinadorMDto>> GetPatrocinadorConMayorMonto()
+        {
+            var patrocinadorConMayorMonto = await _context.Patrocinadors
+                .Include(p => p.Heroes)
+                .OrderByDescending(p => p.Monto)
+                .FirstOrDefaultAsync();
+
+            if (patrocinadorConMayorMonto == null)
+            {
+                return NotFound("No se encontraron patrocinadores que cumplan con el criterio.");
+            }
+
+            var patrocinadorDto = new PatrocinadorMDto
+            {
+                Id = patrocinadorConMayorMonto.Id,
+                Nombre = patrocinadorConMayorMonto.Nombre,
+                Origen = patrocinadorConMayorMonto.Origen,
+                Monto = patrocinadorConMayorMonto.Monto,
+                Heroes= patrocinadorConMayorMonto.Heroes.Select(h => h.Nombre).ToList(),
+            };
+
+            return patrocinadorDto;
+        }
+
+
         // PUT: api/Patrocinador/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]

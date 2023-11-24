@@ -24,7 +24,7 @@ namespace Reto.Controllers
 
         // GET: api/Heroes
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroes(string? nombre = null, string? habilidad = null, string? relacion = null)
+        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroes(string? nombre = null, string? habilidad = null, string? relacionNombre = null)
         {
             IQueryable<Heroe> query = _context.Heroes;
 
@@ -41,9 +41,9 @@ namespace Reto.Controllers
             }
 
             // Filtrar por nombre en relaciones personales
-            if (!string.IsNullOrEmpty(relacion))
+            if (!string.IsNullOrEmpty(relacionNombre))
             {
-                query = query.Where(h => h.Relacions.Any(rel => rel.Nombre.Contains(relacion)));
+                query = query.Where(h => h.Relacions.Any(rel => rel.Nombre.Contains(relacionNombre)));
             }
 
             var heroes = await query.Include(h => h.Habilidads)
@@ -54,14 +54,27 @@ namespace Reto.Controllers
 
             var heroesDto = heroes.Select(h => new HeroeDto
             {
-                // Mapeo existente
+                Id = h.Id,
+                Nombre = h.Nombre,
+                Edad = h.Edad,
+                Escuela = h.Escuela,
+                Habilidades = h.Habilidads.Select(hab => hab.Nombre).ToList(),
+                Debilidades = h.Debilidads.Select(deb => deb.Nombre).ToList(),
+                Patrocinadores = h.Patrocinadors.Select(pat => new PatrocinadorDto
+                {
+                    Nombre = pat.Nombre,
+                    Origen = pat.Origen,
+                    Monto = pat.Monto
+                }).ToList(),
+                Relaciones = h.Relacions.Select(rel => new RelacionDto
+                {
+                    Nombre = rel.Nombre,
+                    Relacion = rel.Relacion1
+                }).ToList()
             }).ToList();
 
             return heroesDto;
         }
-
-
-
 
         // GET: api/Heroes/5
         [HttpGet("{id}")]
@@ -102,6 +115,71 @@ namespace Reto.Controllers
 
             return heroeDto;
         }
+
+        // GET: api/Heroes/adolescentes
+        [HttpGet("adolescentes")]
+        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroesAdolescentes()
+        {
+            var heroesAdolescentes = await _context.Heroes
+                                                   .Where(h => h.Edad < 18)
+                                                   .ToListAsync();
+
+            var heroesDto = heroesAdolescentes.Select(heroe => new HeroeDto
+            {
+                Id = heroe.Id,
+                Nombre = heroe.Nombre,
+                Edad = heroe.Edad,
+                Escuela = heroe.Escuela,
+                Habilidades = heroe.Habilidads.Select(hab => hab.Nombre).ToList(),
+                Debilidades = heroe.Debilidads.Select(deb => deb.Nombre).ToList(),
+                Patrocinadores = heroe.Patrocinadors.Select(pat => new PatrocinadorDto
+                {
+                    Nombre = pat.Nombre,
+                    Origen = pat.Origen,
+                    Monto = pat.Monto,
+                }).ToList(),
+                Relaciones = heroe.Relacions.Select(rel => new RelacionDto
+                {
+                    Nombre = rel.Nombre,
+                    Relacion = rel.Relacion1
+                }).ToList()
+            }).ToList();
+
+            return heroesDto;
+        }
+
+        // GET: api/Heroes/mayoresDeEdad
+        [HttpGet("mayoresDeEdad")]
+        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroesMayoresDeEdad()
+        {
+            var heroesMayoresDeEdad = await _context.Heroes
+                                                    .Where(h => h.Edad >= 18)
+                                                    .ToListAsync();
+
+            var heroesDto = heroesMayoresDeEdad.Select(heroe => new HeroeDto
+            {
+                Id = heroe.Id,
+                Nombre = heroe.Nombre,
+                Edad = heroe.Edad,
+                Escuela = heroe.Escuela,
+                Habilidades = heroe.Habilidads.Select(hab => hab.Nombre).ToList(),
+                Debilidades = heroe.Debilidads.Select(deb => deb.Nombre).ToList(),
+                Patrocinadores = heroe.Patrocinadors.Select(pat => new PatrocinadorDto
+                {
+                    Nombre = pat.Nombre,
+                    Origen = pat.Origen,
+                    Monto = pat.Monto,
+                }).ToList(),
+                Relaciones = heroe.Relacions.Select(rel => new RelacionDto
+                {
+                    Nombre = rel.Nombre,
+                    Relacion = rel.Relacion1
+                }).ToList()
+            }).ToList();
+
+            return heroesDto;
+        }
+
 
         // PUT: api/Heroes/5
         [HttpPut("{id}")]
