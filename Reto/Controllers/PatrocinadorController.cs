@@ -24,19 +24,18 @@ namespace Reto.Controllers
 
         // GET: api/Patrocinador
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<PatrocinadorMDto>>> GetPatrocinadores()
+        public async Task<ActionResult<IEnumerable<PatrocinadorMDto>>> GetPatrocinadores(string? heroe = null)
         {
-            if (_context.Patrocinadors == null)
+            IQueryable<Patrocinador> query = _context.Patrocinadors;
+
+            if (!string.IsNullOrEmpty(heroe))
             {
-                return NotFound();
+                // Filtrar patrocinadores que tienen una relación con el héroe especificado
+                query = query.Where(p => p.Heroes.Any(h => h.Nombre == heroe));
             }
 
-            // Cargar los datos necesarios incluyendo relaciones si es necesario
-            var patrocinadores = await _context.Patrocinadors
-                                       .Include(p => p.Heroes)
-                                       .ToListAsync();
+            var patrocinadores = await query.Include(p => p.Heroes).ToListAsync();
 
-            // Mapear a DTOs
             var patrocinadoresDto = patrocinadores.Select(p => new PatrocinadorMDto
             {
                 Id = p.Id,
@@ -48,6 +47,7 @@ namespace Reto.Controllers
 
             return patrocinadoresDto;
         }
+
 
         // GET: api/Patrocinador/5
         [HttpGet("{id}")]
@@ -77,59 +77,71 @@ namespace Reto.Controllers
         // PUT: api/Patrocinador/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutPatrocinador(int id, PatrocinadorMDto patrocinadorDto)
+
+        public async Task<IActionResult> PutPatrocinador(int id, PatrocinadorMDto PatrocinadorDto)
         {
+
             var patrocinador = await _context.Patrocinadors
-                                             .Include(p => p.Heroes)
-                                             .FirstOrDefaultAsync(p => p.Id == id);
+                                      .Include(p => p.Heroes)
+                                      .FirstOrDefaultAsync(p => p.Id == id);
 
             if (patrocinador == null)
             {
                 return NotFound();
             }
 
-            // Actualizar los datos del patrocinador
-            patrocinador.Nombre = patrocinadorDto.Nombre;
-            patrocinador.Origen = patrocinadorDto.Origen;
-            patrocinador.Monto = patrocinadorDto.Monto;
+            patrocinador.Nombre = PatrocinadorDto.Nombre;
+            patrocinador.Origen = PatrocinadorDto.Origen;
+            patrocinador.Monto = PatrocinadorDto.Monto;
 
-            // Actualizar la relación con los héroes
-            UpdateRelacionConHeroes(patrocinador, patrocinadorDto.Heroes);
+            // Actualizar heroes patrocinados
+            UpdateHeroes(patrocinador, PatrocinadorDto.Heroes);
 
-            await _context.SaveChangesAsync();
+
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!PatrocinadorExists(id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
 
             return NoContent();
         }
 
-        private void UpdateRelacionConHeroes(Patrocinador patrocinador, List<string> nombresHeroes)
+        private void UpdateHeroes(Patrocinador patrocinador, List<string> heroes)
         {
-            var heroesActuales = _context.Set<Dictionary<string, object>>("Heroe_Patrocinador")
-                                         .Where(r => (int)r["PatrocinadorId"] == patrocinador.Id)
-                                         .ToList();
+            // Obtener las habilidades actuales del héroe
+            var heroesActuales = patrocinador.Heroes.ToList();
 
-            foreach (var relacion in heroesActuales)
+            // Eliminar heroes que ya no están en la nueva lista
+            foreach (var heroeActual in heroesActuales)
             {
-                var heroeId = (int)relacion["HeroeId"];
-                var heroe = _context.Heroes.Find(heroeId);
-                if (heroe == null || !nombresHeroes.Contains(heroe.Nombre))
+                if (!heroes.Contains(heroeActual.Nombre))
                 {
-                    _context.Set<Dictionary<string, object>>("Heroe_Patrocinador").Remove(relacion);
+                    patrocinador.Heroes.Remove(heroeActual);
                 }
             }
 
-            foreach (var nombreHeroe in nombresHeroes)
+            //Agregar Nuevos heroes si existen
+            foreach (var nombreHeroe in heroes)
             {
                 var heroe = _context.Heroes.FirstOrDefault(h => h.Nombre == nombreHeroe);
-                if (heroe != null && !heroesActuales.Any(r => (int)r["HeroeId"] == heroe.Id))
+                if (heroe != null && !heroesActuales.Any(r => r.Nombre == heroe.Nombre))
                 {
-                    var nuevaRelacion = new Dictionary<string, object>
-                    {
-                        ["HeroeId"] = heroe.Id,
-                        ["PatrocinadorId"] = patrocinador.Id
-                    };
-                    _context.Set<Dictionary<string, object>>("Heroe_Patrocinador").Add(nuevaRelacion);
+                    patrocinador.Heroes.Add(heroe);
                 }
             }
+
         }
 
 
@@ -145,24 +157,17 @@ namespace Reto.Controllers
                 Monto = patrocinadorDto.Monto
             };
 
-            _context.Patrocinadors.Add(patrocinador);
-            await _context.SaveChangesAsync();
-
             // Relacionar con héroes existentes basándose en nombres
             foreach (var nombreHeroe in patrocinadorDto.Heroes)
             {
                 var heroe = await _context.Heroes.FirstOrDefaultAsync(h => h.Nombre == nombreHeroe);
                 if (heroe != null)
                 {
-                    var heroePatrocinador = new Dictionary<string, object>
-                    {
-                        ["HeroeId"] = heroe.Id,
-                        ["PatrocinadorId"] = patrocinador.Id
-                    };
-                    _context.Set<Dictionary<string, object>>("Heroe_Patrocinador").Add(heroePatrocinador);
+                   patrocinador.Heroes.Add(heroe);
                 }
             }
 
+            _context.Patrocinadors.Add(patrocinador);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction("GetPatrocinador", new { id = patrocinador.Id }, patrocinador);

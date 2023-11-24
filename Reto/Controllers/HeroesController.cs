@@ -24,44 +24,42 @@ namespace Reto.Controllers
 
         // GET: api/Heroes
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroes()
+        public async Task<ActionResult<IEnumerable<HeroeDto>>> GetHeroes(string? nombre = null, string? habilidad = null, string? relacion = null)
         {
-            if (_context.Heroes == null)
+            IQueryable<Heroe> query = _context.Heroes;
+
+            // Filtrar por parte del nombre del héroe
+            if (!string.IsNullOrEmpty(nombre))
             {
-                return NotFound();
+                query = query.Where(h => h.Nombre.Contains(nombre));
             }
 
-            // Cargar los datos necesarios incluyendo relaciones si es necesario
-            var heroes = await _context.Heroes
-                                       .Include(h => h.Habilidads)
-                                       .Include(h => h.Debilidads)
-                                       .Include(h => h.Patrocinadors)
-                                       .Include(h => h.Relacions)
-                                       .ToListAsync();
+            // Filtrar por habilidades
+            if (!string.IsNullOrEmpty(habilidad))
+            {
+                query = query.Where(h => h.Habilidads.Any(hab => hab.Nombre == habilidad));
+            }
 
-            // Mapear a DTOs
+            // Filtrar por nombre en relaciones personales
+            if (!string.IsNullOrEmpty(relacion))
+            {
+                query = query.Where(h => h.Relacions.Any(rel => rel.Nombre.Contains(relacion)));
+            }
+
+            var heroes = await query.Include(h => h.Habilidads)
+                                    .Include(h => h.Debilidads)
+                                    .Include(h => h.Patrocinadors)
+                                    .Include(h => h.Relacions)
+                                    .ToListAsync();
+
             var heroesDto = heroes.Select(h => new HeroeDto
             {
-                Id = h.Id,
-                Nombre = h.Nombre,
-                Edad = h.Edad,
-                Escuela = h.Escuela,
-                Habilidades = h.Habilidads.Select(hab => hab.Nombre).ToList(),
-                Debilidades = h.Debilidads.Select(deb => deb.Nombre).ToList(),
-                Patrocinadores = h.Patrocinadors.Select(pat => new PatrocinadorDto 
-                {
-                    Nombre=pat.Nombre,
-                    Origen = pat.Origen,
-                    Monto =pat.Monto
-                }).ToList(),
-                Relaciones = h.Relacions.Select(rel => new RelacionDto {
-                    Nombre = rel.Nombre,
-                    Relacion = rel.Relacion1
-                }).ToList()
+                // Mapeo existente
             }).ToList();
 
             return heroesDto;
         }
+
 
 
 
